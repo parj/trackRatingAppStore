@@ -4,6 +4,7 @@ set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 TEMP_FILE="./temp.html"
+TRACKING_FILE="track.csv"
 
 function main() {
     init
@@ -16,6 +17,8 @@ function main() {
     extractRating
     check_errs $? "extractRating did not succeed"
     echoColour "GREEN" "Rating is ${RATING}"
+    appendToCSVFile
+    check_errs $? "Unable to write to file"
 }
 
 function init() {
@@ -31,6 +34,7 @@ This is used for grabbing app store rating
 Available options:
     -u / --url              The app store URL to parse - example https://apps.apple.com/gb/app/hsbc-kinetic/id1457310350
     -t / --type             The category of the app in the appstore - example Finance
+    --tracking-file         The name of the csv file to write to
     -h / --help             This message
 EOF
     exit 0
@@ -53,6 +57,11 @@ function parseArgs() {
             -t|--type)
                 TYPE=$2
                 echoColour "GREEN" "TYPE is ${TYPE}"
+                shift
+                ;;
+            --tracking-file)
+                TRACKING_FILE=$2
+                echoColour "GREEN" "TRACKING FILE is ${TRACKING_FILE}"
                 shift
                 ;;
             --) # end argument parsing
@@ -88,14 +97,25 @@ function checkArgs() {
 
 function downloadPage() {
     echoColour "YELLOW" "Removing temp file"
-    rm -f $TEMP_FILE
+    removeTempFile
 
     echoColour "YELLOW" "Downloading page ${APPSTORE_URL} to ${TEMP_FILE} "
     curl --url "${APPSTORE_URL}" --output $TEMP_FILE 
 }
 
 function extractRating() {
+    echoColour "YELLOW" "Extracting rating"
     RATING=$(grep "in ${TYPE}" temp.html | sed -e 's/^[[:space:]]*//' | sed 's/ /,/g' | awk -F"," '{print $1}' | awk -F "#" '{print $2}')
+}
+
+function appendToCSVFile() {
+    echoColour "YELLOW" "Writing to file"
+    local timestamp=$(date '+%Y%m%d, %H:%M:%S')
+    echo "${timestamp}, ${RATING}" >> $TRACKING_FILE
+}
+
+function removeTempFile() {
+    rm -f $TEMP_FILE
 }
 
 main "$@"
